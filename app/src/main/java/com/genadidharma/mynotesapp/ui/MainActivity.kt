@@ -1,12 +1,16 @@
 package com.genadidharma.mynotesapp.ui
 
 import android.content.Intent
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.genadidharma.mynotesapp.R
 import com.genadidharma.mynotesapp.adapter.NoteAdapter
+import com.genadidharma.mynotesapp.db.DatabaseContract.NoteColumns.Companion.CONTENT_URI
 import com.genadidharma.mynotesapp.db.NoteHelper
 import com.genadidharma.mynotesapp.entity.Note
 import com.genadidharma.mynotesapp.helper.MappingHelper
@@ -42,10 +46,22 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(intent, NoteAddUpdateActivity.REQUEST_ADD)
         }
 
-        noteHelper = NoteHelper.getInstance(applicationContext)
+        val handlerThread = HandlerThread("DataObserver")
+        handlerThread.start()
+        val handler = Handler(handlerThread.looper)
+
+        val myObserver = object : ContentObserver(handler){
+            override fun onChange(selfChange: Boolean) {
+                loadNoteAsync()
+            }
+        }
+
+        /*noteHelper = NoteHelper.getInstance(applicationContext)
         noteHelper.open()
 
-        loadNoteAsync()
+        loadNoteAsync()*/
+
+        contentResolver.registerContentObserver(CONTENT_URI, true, myObserver)
 
         if (savedInstanceState == null) {
             loadNoteAsync()
@@ -103,7 +119,8 @@ class MainActivity : AppCompatActivity() {
         GlobalScope.launch(Dispatchers.Main) {
             progressbar.visibility = View.VISIBLE
             val defferedNotes = async(Dispatchers.IO) {
-                val cursor = noteHelper.queryAll()
+//                val cursor = noteHelper.queryAll()
+                val cursor = contentResolver?.query(CONTENT_URI, null, null, null, null)
                 MappingHelper.mapCursorToArrayList(cursor)
             }
             progressbar.visibility = View.INVISIBLE
